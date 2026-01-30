@@ -9,7 +9,7 @@
 -- --- YÜKLEYİCİ AYARLARI ---
 -- Eğer bir Loadstring kullanıyorsan buraya yapıştır.
 -- Eğer scripti direkt executor'ın "AutoExec" klasörüne attıysan burayı boş bırakabilirsin.
-getgenv().MyScriptURL = [[loadstring(game:HttpGet("SENIN_SCRIPT_LINKIN_BURAYA"))()]] 
+getgenv().MyScriptURL = [[loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/nbrla.lua"))()]] 
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 -- Tekrar yüklenmeyi önlemek için kontrol (Queue on teleport için gerekebilir)
