@@ -4,18 +4,17 @@
     1. Boss Aura & Hover (NPC üstüne 5m sabitlenme)
     2. Auto Retry (Otomatik Tekrar)
     3. Smart Auto-Start: Sunucu değişince ayarlar korunur ve script yeniden başlar.
+    
+    GÜNCELLEME: Saldırı hızı devasa artırıldı (No-Yield Logic).
 ]]
 
 -- --- YÜKLEYİCİ AYARLARI ---
--- Eğer bir Loadstring kullanıyorsan buraya yapıştır.
--- Eğer scripti direkt executor'ın "AutoExec" klasörüne attıysan burayı boş bırakabilirsin.
 getgenv().MyScriptURL = [[loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/rrr55.lua"))()]] 
 
 if not game:IsLoaded() then game.Loaded:Wait() end
--- Tekrar yüklenmeyi önlemek için kontrol (Queue on teleport için gerekebilir)
+
 if _G.EndardHubLoaded then 
-    -- Eğer zaten yüklüyse ve ayarlar farklıysa diye bildirim geçilebilir ama şimdilik return.
-    -- return 
+    -- Zaten yüklüyse devam et
 end
 _G.EndardHubLoaded = true
 
@@ -129,7 +128,6 @@ local function CreateMenu()
         local box = Instance.new("TextButton")
         box.Size = UDim2.new(0, 40, 0, 22)
         box.Position = UDim2.new(1, -50, 0.5, -11)
-        -- Config durumuna göre rengi ayarla
         box.BackgroundColor3 = Config[configKey] and Colors.Enabled or Colors.Disabled
         box.Text = ""
         box.Parent = container
@@ -137,7 +135,6 @@ local function CreateMenu()
         
         local indicator = Instance.new("Frame")
         indicator.Size = UDim2.new(0, 14, 0, 14)
-        -- Config durumuna göre pozisyonu ayarla
         indicator.Position = Config[configKey] and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 4, 0.5, -7)
         indicator.BackgroundColor3 = Colors.Text
         indicator.Parent = box
@@ -145,10 +142,8 @@ local function CreateMenu()
 
         box.MouseButton1Click:Connect(function()
             Config[configKey] = not Config[configKey]
-            -- Görsel Güncelleme
             box.BackgroundColor3 = Config[configKey] and Colors.Enabled or Colors.Disabled
             indicator:TweenPosition(Config[configKey] and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 4, 0.5, -7), "Out", "Quad", 0.2, true)
-            -- Ayarı Kaydet
             SaveConfig()
         end)
     end
@@ -203,16 +198,20 @@ local function CreateMenu()
                         -- [[ SON ]]
 
                         if #targets > 0 then
-                            Combat:InvokeServer(targets, true, {
-                                ["CanParry"] = true,
-                                ["OnCharacterHit"] = function() end,
-                                ["Origin"] = myChar.PrimaryPart.CFrame,
-                                ["Parries"] = {},
-                                ["WindowID"] = myChar.Name .. "_Punch",
-                                ["LocalCharacter"] = myChar,
-                                ["SkillID"] = "Punch"
-                            })
-                            Skill:InvokeServer("Punch", myChar, Vector3.new(0,0,0), 1, 1)
+                            -- [[ HIZLANDIRILMIŞ SALDIRI BLOĞU ]]
+                            -- InvokeServer'ı task.spawn içine aldık ki server yanıtını beklemeden seri atsın.
+                            task.spawn(function()
+                                Combat:InvokeServer(targets, true, {
+                                    ["CanParry"] = true,
+                                    ["OnCharacterHit"] = function() end,
+                                    ["Origin"] = myChar.PrimaryPart.CFrame,
+                                    ["Parries"] = {},
+                                    ["WindowID"] = myChar.Name .. "_Punch",
+                                    ["LocalCharacter"] = myChar,
+                                    ["SkillID"] = "Punch"
+                                })
+                                Skill:InvokeServer("Punch", myChar, Vector3.new(0,0,0), 1, 1)
+                            end)
                         end
                     end
                 end)
@@ -224,7 +223,11 @@ local function CreateMenu()
                     task.wait(2)
                 end
             end
-            task.wait(0.02)
+            
+            -- [[ DE VASA HIZ ]]
+            -- Eski değer: task.wait(0.02) -> Yeni değer: task.wait()
+            -- Bu, scriptin FPS hızında (limit olmadan) çalışmasını sağlar.
+            task.wait() 
         end
     end)
 end
@@ -234,16 +237,10 @@ local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport)
 if queue_on_teleport then
     LocalPlayer.OnTeleport:Connect(function(State)
         if Config.AutoExecute then
-            -- Ayarları son kez kaydet
             SaveConfig()
-            
-            -- Eğer loadstring varsa onu kuyruğa al, yoksa uyarı ver
             if getgenv().MyScriptURL and #getgenv().MyScriptURL > 10 then
                 queue_on_teleport(getgenv().MyScriptURL)
             else
-                -- Kullanıcı URL girmediyse dahi, ayarlar JSON'da kayıtlıdır.
-                -- Eğer kullanıcı bu dosyayı "AutoExec" klasörüne attıysa
-                -- zaten otomatik çalışır ve JSON'dan ayarları okur.
                 print("EndardHub: Loadstring tanımlı değil, ancak ayarlar kaydedildi.")
             end
         end
@@ -255,7 +252,6 @@ task.spawn(function()
     local NPCs = workspace:WaitForChild("Characters"):WaitForChild("Server"):WaitForChild("NPCs")
     print("EndardHub: NPC bekleniyor...")
     
-    -- Hemen Config Yüklemeyi Dene
     LoadConfig()
 
     while true do
