@@ -110,7 +110,7 @@ end)
 
 -- Delayed Auto-Hop Activation (15s)
 task.spawn(function()
-    task.wait(7)
+    task.wait(15)
     autoHopActive = true
     AutoHopToggle.Text = "AUTO START & HOP: AÇIK"
     AutoHopToggle.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
