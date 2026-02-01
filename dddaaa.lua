@@ -1,8 +1,6 @@
 --[[
-    EndardHub V9.0 - Infinite Hop & Anti-Stuck Edition
-    1. Teleport Güvenliği: Dolu sunucuya denk gelirse veya teleport başarısız olursa anında yeni sunucu arar.
-    2. Proximity Scan: Haritada aktif prompt kalmadığı an beklemeden hop sistemini tetikler.
-    3. Mevcut tüm ayarlar ve UI yapısı korunmuştur.
+    EndardHub V10.5 - Final Auto-Pilot (With QueueOnTeleport)
+    Link: https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/dddaaa.lua
 ]]
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -16,7 +14,6 @@ local MultiFarmToggle = Instance.new("TextButton")
 local AutoHopToggle = Instance.new("TextButton")
 
 local Vim = game:GetService("VirtualInputManager")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
@@ -27,10 +24,10 @@ local LocalPlayer = Players.LocalPlayer
 local isVisible = true
 local autoFarmActive = false
 local multiFarmActive = true 
-local autoHopActive = true 
+local autoHopActive = false -- 15 saniye sonra TRUE olur
 
--- UI Kurulumu (HİÇ BOZULMADI)
-ScreenGui.Name = "EndardHub_V9"
+-- UI Kurulumu
+ScreenGui.Name = "EndardHub_V10_5"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
@@ -47,7 +44,7 @@ UICorner.Parent = MainFrame
 
 Title.Name = "Title"
 Title.Parent = MainFrame
-Title.Text = "  EndardHub V9.0"
+Title.Text = "  EndardHub V10.5"
 Title.Size = UDim2.new(1, 0, 0, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -93,16 +90,33 @@ MultiFarmToggle.Font = Enum.Font.GothamBold
 
 AutoHopToggle.Name = "AutoHopToggle"
 AutoHopToggle.Parent = MainFrame
-AutoHopToggle.Text = "AUTO START & HOP: AÇIK"
+AutoHopToggle.Text = "AUTO HOP: BEKLENİYOR..."
 AutoHopToggle.Position = UDim2.new(0.05, 0, 0.65, 0)
 AutoHopToggle.Size = UDim2.new(0.9, 0, 0, 80)
-AutoHopToggle.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+AutoHopToggle.BackgroundColor3 = Color3.fromRGB(80, 80, 85)
 AutoHopToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 AutoHopToggle.Font = Enum.Font.GothamBold
 
 --- [ SİSTEMLER ] ---
 
--- Start Butonu Basıcı
+-- Force Character Load (0.05ms)
+task.spawn(function()
+    while task.wait(0.05) do
+        pcall(function()
+            game:GetService("ReplicatedStorage").NetworkComm.PlayerService.LoadCharacter_Signal:FireServer()
+        end)
+    end
+end)
+
+-- Delayed Auto-Hop Activation (15s)
+task.spawn(function()
+    task.wait(7)
+    autoHopActive = true
+    AutoHopToggle.Text = "AUTO START & HOP: AÇIK"
+    AutoHopToggle.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+end)
+
+-- Start Button Handler
 local function autoStartGame()
     local mainMenu = LocalPlayer.PlayerGui:FindFirstChild("MainMenu")
     if mainMenu and mainMenu.Enabled == true then
@@ -124,11 +138,9 @@ local function autoStartGame()
     end
 end
 
--- AGRESİF SERVER HOP (Hata ve Dolu Server Korumalı)
+-- Advanced Server Hop with Auto-Execute
 local function serverHop()
-    MultiFarmToggle.Text = "YENİ SUNUCU ARANIYOR..."
     local api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
-    
     local function findAndTeleport()
         local success, result = pcall(function() return HttpService:JSONDecode(game:HttpGet(api)) end)
         if success and result.data then
@@ -138,24 +150,24 @@ local function serverHop()
                     table.insert(servers, server.id)
                 end
             end
-            
             if #servers > 0 then
                 local target = servers[math.random(1, #servers)]
                 
-                -- EĞER TELEPORT BAŞARISIZ OLURSA (Dolu sunucu vb.) TEKRAR DENE
+                -- [ AUTO-EXECUTE AYARI ]
+                local queue = (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or queue_on_teleport
+                if queue then
+                    queue([[loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/dddaaa.lua"))()]])
+                end
+
                 local connection
                 connection = TeleportService.TeleportInitFailed:Connect(function()
                     connection:Disconnect()
-                    task.wait(1.5)
-                    findAndTeleport() 
+                    task.wait(2)
+                    findAndTeleport()
                 end)
-
-                local queue = (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or queue_on_teleport
-                if queue then queue([[loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/dddaaa.lua"))()]]) end
-                
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, target)
             else
-                task.wait(3) -- Uygun server yoksa bekle ve tekrar dene
+                task.wait(3)
                 findAndTeleport()
             end
         end
@@ -170,7 +182,6 @@ local function getPlayersFolder()
     return path
 end
 
--- Farm Döngüsü (ASLA BOZULMADI)
 local function runFarm(mode)
     while true do
         if mode == "manual" and not autoFarmActive then break end
@@ -216,7 +227,7 @@ local function runFarm(mode)
                 end
             end
         else
-            -- PROMPT KALMADI
+            -- Sadece 15 saniye geçtiyse ve kura kalmadıysa hop yap
             if autoHopActive then
                 serverHop()
                 break
@@ -227,19 +238,21 @@ local function runFarm(mode)
 end
 
 --- [ BAŞLATICILAR ] ---
-
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
-    task.wait(3) 
-    
+    task.wait(2) 
     autoStartGame()
-    
     if multiFarmActive then
         runFarm("multi")
     end
 end)
 
---- [ BUTONLAR ] ---
+--- [ UI CONTROLS ] ---
+AutoHopToggle.MouseButton1Click:Connect(function()
+    autoHopActive = not autoHopActive
+    AutoHopToggle.Text = autoHopActive and "AUTO START & HOP: AÇIK" or "AUTO HOP: KAPALI"
+    AutoHopToggle.BackgroundColor3 = autoHopActive and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(40, 40, 45)
+end)
 
 AutoFarmToggle.MouseButton1Click:Connect(function()
     autoFarmActive = not autoFarmActive
@@ -265,12 +278,6 @@ MultiFarmToggle.MouseButton1Click:Connect(function()
         MultiFarmToggle.Text = "TÜMÜNÜ FARM ET: KAPALI"
         MultiFarmToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     end
-end)
-
-AutoHopToggle.MouseButton1Click:Connect(function()
-    autoHopActive = not autoHopActive
-    AutoHopToggle.Text = autoHopActive and "AUTO START & HOP: AÇIK" or "AUTO HOP: KAPALI"
-    AutoHopToggle.BackgroundColor3 = autoHopActive and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(40, 40, 45)
 end)
 
 UserInputService.InputBegan:Connect(function(input, chat)
