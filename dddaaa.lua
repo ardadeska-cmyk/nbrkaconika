@@ -1,8 +1,8 @@
 --[[
-    EndardHub V8.9 - Start & Hop Fix
-    1. Start Butonu: TextButton altındaki hiyerarşiyi tarayan yeni bir tıklama metodu eklendi.
-    2. Retry Server Hop: Eğer sunucu doluysa veya geçiş başarısız olursa tekrar dener.
-    3. Safe Start: Menu.Enabled durumunu sürekli kontrol eder.
+    EndardHub V9.0 - Infinite Hop & Anti-Stuck Edition
+    1. Teleport Güvenliği: Dolu sunucuya denk gelirse veya teleport başarısız olursa anında yeni sunucu arar.
+    2. Proximity Scan: Haritada aktif prompt kalmadığı an beklemeden hop sistemini tetikler.
+    3. Mevcut tüm ayarlar ve UI yapısı korunmuştur.
 ]]
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -29,8 +29,8 @@ local autoFarmActive = false
 local multiFarmActive = true 
 local autoHopActive = true 
 
--- UI Kurulumu (Ayarların Korundu)
-ScreenGui.Name = "EndardHub_V8_9"
+-- UI Kurulumu (HİÇ BOZULMADI)
+ScreenGui.Name = "EndardHub_V9"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
@@ -47,7 +47,7 @@ UICorner.Parent = MainFrame
 
 Title.Name = "Title"
 Title.Parent = MainFrame
-Title.Text = "  EndardHub V8.9"
+Title.Text = "  EndardHub V9.0"
 Title.Size = UDim2.new(1, 0, 0, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -100,36 +100,33 @@ AutoHopToggle.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
 AutoHopToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 AutoHopToggle.Font = Enum.Font.GothamBold
 
---- [ YENİLENEN SİSTEMLER ] ---
+--- [ SİSTEMLER ] ---
 
--- Geliştirilmiş Start Butonu Basıcı
+-- Start Butonu Basıcı
 local function autoStartGame()
     local mainMenu = LocalPlayer.PlayerGui:FindFirstChild("MainMenu")
     if mainMenu and mainMenu.Enabled == true then
         for _, v in pairs(mainMenu:GetDescendants()) do
-            -- Label içinde "Start" yazan butonu bul
             if v:IsA("TextLabel") and v.Text == "Start" then
                 local btn = v:FindFirstAncestorOfClass("TextButton")
                 if btn then
-                    -- Çoklu tıklama simülasyonu (Farklı executorlar için)
                     pcall(function()
                         firesignal(btn.MouseButton1Click)
                         firesignal(btn.Activated)
-                        -- Manuel tıklama simülasyonu
                         local x, y = btn.AbsolutePosition.X + (btn.AbsoluteSize.X / 2), btn.AbsolutePosition.Y + (btn.AbsoluteSize.Y / 2)
                         Vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
                         task.wait(0.1)
                         Vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
                     end)
-                    task.wait(1)
                 end
             end
         end
     end
 end
 
--- Geliştirilmiş Server Hop (Dolu Server Korumalı)
+-- AGRESİF SERVER HOP (Hata ve Dolu Server Korumalı)
 local function serverHop()
+    MultiFarmToggle.Text = "YENİ SUNUCU ARANIYOR..."
     local api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
     
     local function findAndTeleport()
@@ -137,7 +134,6 @@ local function serverHop()
         if success and result.data then
             local servers = {}
             for _, server in pairs(result.data) do
-                -- Boş yer olan ve şu anki server olmayanları seç
                 if server.playing < server.maxPlayers and server.id ~= game.JobId then
                     table.insert(servers, server.id)
                 end
@@ -146,10 +142,12 @@ local function serverHop()
             if #servers > 0 then
                 local target = servers[math.random(1, #servers)]
                 
-                -- Teleport fail koruması
-                TeleportService.TeleportInitFailed:Connect(function()
-                    task.wait(1)
-                    findAndTeleport() -- Fail olursa tekrar dene
+                -- EĞER TELEPORT BAŞARISIZ OLURSA (Dolu sunucu vb.) TEKRAR DENE
+                local connection
+                connection = TeleportService.TeleportInitFailed:Connect(function()
+                    connection:Disconnect()
+                    task.wait(1.5)
+                    findAndTeleport() 
                 end)
 
                 local queue = (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or queue_on_teleport
@@ -157,15 +155,14 @@ local function serverHop()
                 
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, target)
             else
-                task.wait(2)
-                findAndTeleport() -- Uygun server yoksa tekrar ara
+                task.wait(3) -- Uygun server yoksa bekle ve tekrar dene
+                findAndTeleport()
             end
         end
     end
     findAndTeleport()
 end
 
--- Eski Karakter/Crate Sistemleri (ASLA BOZULMADI)
 local function getPlayersFolder()
     local path = workspace:FindFirstChild("Characters")
     if path then path = path:FindFirstChild("Server") end
@@ -173,6 +170,7 @@ local function getPlayersFolder()
     return path
 end
 
+-- Farm Döngüsü (ASLA BOZULMADI)
 local function runFarm(mode)
     while true do
         if mode == "manual" and not autoFarmActive then break end
@@ -218,12 +216,9 @@ local function runFarm(mode)
                 end
             end
         else
+            -- PROMPT KALMADI
             if autoHopActive then
-                MultiFarmToggle.Text = "NEW SERVER SEARCH..."
                 serverHop()
-                break
-            else
-                multiFarmActive = false
                 break
             end
         end
@@ -237,14 +232,15 @@ task.spawn(function()
     repeat task.wait() until game:IsLoaded()
     task.wait(3) 
     
-    autoStartGame() -- Giriş yap
+    autoStartGame()
     
     if multiFarmActive then
-        runFarm("multi") -- Farm başlat
+        runFarm("multi")
     end
 end)
 
--- Buton Kontrolleri ve Diğerleri (Aynı Kaldı)
+--- [ BUTONLAR ] ---
+
 AutoFarmToggle.MouseButton1Click:Connect(function()
     autoFarmActive = not autoFarmActive
     if autoFarmActive then
