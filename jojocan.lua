@@ -8,7 +8,6 @@ if CoreGui:FindFirstChild("Endware") then
     CoreGui.Endware:Destroy()
 end
 
--- Tüm bağlantıları (event connections) tutacağımız tablo
 local connections = {}
 
 -- Ana GUI Oluşturma
@@ -85,7 +84,8 @@ table.insert(connections, UIS.InputChanged:Connect(function(input)
 end))
 
 -- Checkbox Ayarları
-local isAutoExecEnabled = false
+local isAutoExecEnabled = true -- Varsayılan olarak AÇIK
+
 local AutoExecContainer = Instance.new("Frame")
 AutoExecContainer.Size = UDim2.new(1, -40, 0, 30)
 AutoExecContainer.Position = UDim2.new(0, 20, 0, 70)
@@ -95,7 +95,7 @@ AutoExecContainer.Parent = MainFrame
 local CheckboxButton = Instance.new("TextButton")
 CheckboxButton.Size = UDim2.new(0, 24, 0, 24)
 CheckboxButton.Position = UDim2.new(0, 0, 0.5, -12)
-CheckboxButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+CheckboxButton.BackgroundColor3 = Color3.fromRGB(85, 170, 255) -- Açık olduğu için varsayılan renk mavi
 CheckboxButton.Text = ""
 CheckboxButton.Parent = AutoExecContainer
 
@@ -118,20 +118,50 @@ CheckboxLabel.TextSize = 14
 CheckboxLabel.TextXAlignment = Enum.TextXAlignment.Left
 CheckboxLabel.Parent = AutoExecContainer
 
+-- Ortak Execute Fonksiyonu (Scriptleri task.spawn ile eşzamanlı çalıştırır)
+local function ExecuteScripts()
+    -- Jojocan
+    task.spawn(function()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/jojocan.lua"))()
+        end)
+    end)
+    
+    -- HubrisScript (Bizzare Lineage)
+    task.spawn(function()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/NotHubris/HubrisScript/refs/heads/main/Bizzare%20Lineage"))()
+        end)
+    end)
+end
+
+-- Menü ilk açıldığında Auto Execute default AÇIK geldiği için direkt enjekte et
+ExecuteScripts()
+
 -- Checkbox Toggle İşlevi
 table.insert(connections, CheckboxButton.MouseButton1Click:Connect(function()
     isAutoExecEnabled = not isAutoExecEnabled
     
     local targetColor = isAutoExecEnabled and Color3.fromRGB(85, 170, 255) or Color3.fromRGB(35, 35, 45)
     TweenService:Create(CheckboxButton, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+
+    -- Checkbox her açıldığında scriptleri anında tekrar enjekte et
+    if isAutoExecEnabled then
+        ExecuteScripts()
+    end
 end))
 
 -- Teleport (Queue On Teleport) Mantığı
 local queue_teleport = queue_on_teleport or syn and syn.queue_on_teleport or fluxus and fluxus.queue_on_teleport
+
+-- Teleport sonrası çalışacak raw string (Yine task.spawn bloklarıyla)
 local scriptToQueue = [[
-    task.wait(2)
-    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/jojocan.lua"))() end)
-    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/NotHubris/HubrisScript/refs/heads/main/Bizzare%20Lineage"))() end)
+    task.spawn(function()
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/jojocan.lua"))() end)
+    end)
+    task.spawn(function()
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/NotHubris/HubrisScript/refs/heads/main/Bizzare%20Lineage"))() end)
+    end)
 ]]
 
 -- Oyuncu teleport olduğunda çalışacak bağlantı
@@ -161,11 +191,9 @@ UnloadCorner.Parent = UnloadButton
 
 -- Unload İşlevi
 table.insert(connections, UnloadButton.MouseButton1Click:Connect(function()
-    -- Açık olan bütün eventleri ve döngüleri kapat
     for _, connection in ipairs(connections) do
         connection:Disconnect()
     end
-    -- Menüyü tamamen oyundan sil
     EndwareGui:Destroy()
 end))
 
@@ -175,8 +203,3 @@ table.insert(connections, UIS.InputBegan:Connect(function(input, gameProcessed)
         MainFrame.Visible = not MainFrame.Visible
     end
 end))
-
--- Başlangıçta scriptlerin mevcut sunucuda ilk defa execute edilmesi (Opsiyonel)
--- İstersen menü açıldığı anda çalışmasını sağlamak için alttaki comment'i kaldırabilirsin:
--- pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/jojocan.lua"))() end)
--- pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/NotHubris/HubrisScript/refs/heads/main/Bizzare%20Lineage"))() end)
