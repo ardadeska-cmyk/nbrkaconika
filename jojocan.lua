@@ -123,7 +123,7 @@ local function ExecuteScripts()
     -- Jojocan
     task.spawn(function()
         pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/jojocan.lua"))()
+            loadstring(game:HttpGet(""))()
         end)
     end)
     
@@ -157,7 +157,7 @@ local queue_teleport = queue_on_teleport or syn and syn.queue_on_teleport or flu
 -- Teleport sonrası çalışacak raw string (Yine task.spawn bloklarıyla)
 local scriptToQueue = [[
     task.spawn(function()
-        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/ardadeska-cmyk/nbrkaconika/refs/heads/main/jojocan.lua"))() end)
+        pcall(function() loadstring(game:HttpGet(""))() end)
     end)
     task.spawn(function()
         pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/NotHubris/HubrisScript/refs/heads/main/Bizzare%20Lineage"))() end)
